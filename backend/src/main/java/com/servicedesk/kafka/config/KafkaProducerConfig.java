@@ -32,6 +32,9 @@ public class KafkaProducerConfig {
     @Value("${KAFKA_PASSWORD:}")
     private String kafkaPassword;
 
+    @Value("${KAFKA_CA_CERT:}")
+    private String kafkaCaCert;
+
     @Bean
     public ProducerFactory<String, Object> producerFactory() {
         Map<String, Object> config = new HashMap<>();
@@ -44,23 +47,36 @@ public class KafkaProducerConfig {
         config.put(ProducerConfig.RETRIES_CONFIG, 3);
         config.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
 
+        configureSecurity(config);
+
+        return new DefaultKafkaProducerFactory<>(config);
+    }
+
+    private void configureSecurity(Map<String, Object> config) {
+
         if (!"PLAINTEXT".equalsIgnoreCase(securityProtocol)) {
+
             config.put("security.protocol", securityProtocol);
             config.put(SaslConfigs.SASL_MECHANISM, saslMechanism);
+
             config.put(
                 SaslConfigs.SASL_JAAS_CONFIG,
                 "org.apache.kafka.common.security.scram.ScramLoginModule required "
                     + "username=\"" + kafkaUsername + "\" "
                     + "password=\"" + kafkaPassword + "\";"
             );
-        }
 
-        return new DefaultKafkaProducerFactory<>(config);
+            if (!kafkaCaCert.isBlank()) {
+                config.put("ssl.truststore.certificates", kafkaCaCert);
+                config.put("ssl.truststore.type", "PEM");
+            }
+        }
     }
 
     @Bean
     public KafkaTemplate<String, Object> kafkaTemplate(
             ProducerFactory<String, Object> producerFactory) {
+
         return new KafkaTemplate<>(producerFactory);
     }
 }
