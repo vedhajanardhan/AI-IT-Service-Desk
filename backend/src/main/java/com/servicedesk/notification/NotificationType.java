@@ -1,0 +1,11 @@
+package com.servicedesk.notification;
+
+public enum NotificationType {
+    INCIDENT_ASSIGNED,
+    AI_ANALYSIS_COMPLETED,
+    REMEDIATION_APPROVAL_REQUIRED,
+    REMEDIATION_COMPLETED,
+    REMEDIATION_FAILED,
+    INCIDENT_ESCALATED,
+    INCIDENT_RESOLVED
+}
