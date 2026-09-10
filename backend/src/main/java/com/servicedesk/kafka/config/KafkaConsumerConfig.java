@@ -1,6 +1,7 @@
 package com.servicedesk.kafka.config;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.config.SaslConfigs;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -16,15 +17,6 @@ import org.springframework.util.backoff.FixedBackOff;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Consumer-side Kafka wiring: manual acknowledgment (so a listener only
- * commits an offset after it has actually finished, not just received the
- * message) plus a bounded retry-then-dead-letter error handler. A message
- * that keeps failing (e.g. a bug in remediation execution, not a
- * transient blip) gets retried 3 times with backoff and then routed to
- * the dead-letter topic instead of blocking the partition forever or
- * silently vanishing.
- */
 @Configuration
 public class KafkaConsumerConfig {
 
@@ -37,15 +29,41 @@ public class KafkaConsumerConfig {
     @Value("${app.kafka.topics.dead-letter}")
     private String deadLetterTopic;
 
+    @Value("${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}")
+    private String securityProtocol;
+
+    @Value("${KAFKA_SASL_MECHANISM:}")
+    private String saslMechanism;
+
+    @Value("${KAFKA_USERNAME:}")
+    private String kafkaUsername;
+
+    @Value("${KAFKA_PASSWORD:}")
+    private String kafkaPassword;
+
     @Bean
     public DefaultKafkaConsumerFactory<String, String> consumerFactory() {
+
         Map<String, Object> config = new HashMap<>();
+
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         config.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+
+        if (!"PLAINTEXT".equalsIgnoreCase(securityProtocol)) {
+            config.put("security.protocol", securityProtocol);
+            config.put(SaslConfigs.SASL_MECHANISM, saslMechanism);
+            config.put(
+                SaslConfigs.SASL_JAAS_CONFIG,
+                "org.apache.kafka.common.security.scram.ScramLoginModule required "
+                    + "username=\"" + kafkaUsername + "\" "
+                    + "password=\"" + kafkaPassword + "\";"
+            );
+        }
+
         return new DefaultKafkaConsumerFactory<>(config);
     }
 
@@ -56,14 +74,27 @@ public class KafkaConsumerConfig {
 
         ConcurrentKafkaListenerContainerFactory<String, String> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(consumerFactory);
-        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
 
-        // 3 retries, 1s apart, then dead-letter - so a redelivered/poison
-        // message can't spin forever or silently disappear.
-        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate,
-                (record, ex) -> new org.apache.kafka.common.TopicPartition(deadLetterTopic, record.partition()));
-        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 3L));
+        factory.setConsumerFactory(consumerFactory);
+
+        factory.getContainerProperties()
+                .setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+
+        DeadLetterPublishingRecoverer recoverer =
+                new DeadLetterPublishingRecoverer(
+                        kafkaTemplate,
+                        (record, ex) -> new org.apache.kafka.common.TopicPartition(
+                                deadLetterTopic,
+                                record.partition()
+                        )
+                );
+
+        DefaultErrorHandler errorHandler =
+                new DefaultErrorHandler(
+                        recoverer,
+                        new FixedBackOff(1000L, 3L)
+                );
+
         factory.setCommonErrorHandler(errorHandler);
 
         return factory;
