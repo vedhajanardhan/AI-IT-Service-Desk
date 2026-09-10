@@ -41,6 +41,9 @@ public class KafkaConsumerConfig {
     @Value("${KAFKA_PASSWORD:}")
     private String kafkaPassword;
 
+    @Value("${KAFKA_CA_CERT:}")
+    private String kafkaCaCert;
+
     @Bean
     public DefaultKafkaConsumerFactory<String, String> consumerFactory() {
 
@@ -53,18 +56,30 @@ public class KafkaConsumerConfig {
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
 
+        configureSecurity(config);
+
+        return new DefaultKafkaConsumerFactory<>(config);
+    }
+
+    private void configureSecurity(Map<String, Object> config) {
+
         if (!"PLAINTEXT".equalsIgnoreCase(securityProtocol)) {
+
             config.put("security.protocol", securityProtocol);
             config.put(SaslConfigs.SASL_MECHANISM, saslMechanism);
+
             config.put(
                 SaslConfigs.SASL_JAAS_CONFIG,
                 "org.apache.kafka.common.security.scram.ScramLoginModule required "
                     + "username=\"" + kafkaUsername + "\" "
                     + "password=\"" + kafkaPassword + "\";"
             );
-        }
 
-        return new DefaultKafkaConsumerFactory<>(config);
+            if (!kafkaCaCert.isBlank()) {
+                config.put("ssl.truststore.certificates", kafkaCaCert);
+                config.put("ssl.truststore.type", "PEM");
+            }
+        }
     }
 
     @Bean
