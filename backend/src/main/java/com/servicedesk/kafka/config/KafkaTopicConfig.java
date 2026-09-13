@@ -22,7 +22,7 @@ public class KafkaTopicConfig {
     }
 
     private NewTopic topic(String name) {
-        return TopicBuilder.name(name).partitions(3).replicas(1).build();
+        return TopicBuilder.name(name).partitions(2).replicas(1).build();
     }
 
     @Bean public NewTopic incidentCreatedTopic() { return topic(topics.incidentCreated()); }
