@@ -587,7 +587,7 @@ When the backend is running:
 
 Production:
 
-**https://ai-it-service-desk.onrender.com/swagger-ui.html**
+**https://ai-it-service-desk.onrender.com/swagger-ui/index.html**
 
 OpenAPI specification:
 
