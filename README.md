@@ -700,14 +700,13 @@ PostgreSQL + Redis + Kafka
 Development and production configuration are separated through environment variables rather than hard-coded credentials.
 
 ---
-### 📸 Screenshots
+## 📸 Screenshots
 
-**Incident Queue**
-![Incident Queue](docs/incident-queue.png)
+### Incident Queue
+![Incident Queue](Screenshots/incident-queue.png)
 
-**Remediation Catalog**
-![Remediation Catalog](docs/remediation-catalog.png)
-
+### Remediation Catalog
+![Remediation Catalog](Screenshots/remediation-catalog.png)
 
 # 📈 Future Improvements
 
